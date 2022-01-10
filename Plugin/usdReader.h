@@ -36,7 +36,7 @@
 
 #include "DDImage/GeoReader.h"
 #include "DDImage/GeoReaderDescription.h"
-#include "DDImage/SceneView_KnobI.h"
+#include "DDImage/SceneItem.h"
 
 class usdReaderFormat;
 
@@ -69,6 +69,15 @@ class usdReader : public DD::Image::GeoReader
 
   /// Get the scene graph knob for the geo node that the reader is attached to
   DD::Image::SceneGraph_KnobI* getSceneGraphKnob();
+
+  /// Validate scene items and report error if the items are not supported
+  void validateItems();
+
+  ///Clear all errors immediately
+  void forceClearErrors();
+
+  bool _fileExists{ false };
+  bool _validateSceneItems{ false };
 };
 
 #endif  // USDREADER_H

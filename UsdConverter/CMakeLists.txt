@@ -23,6 +23,7 @@
 #===------------------------------------------------------------------------===
 # Create object library so we can unittest internal functions
 add_library( UsdConverterObjectlib OBJECT
+    src/UsdCommon.cpp
     src/UsdGeoConverter.cpp
     src/UsdAttrConverter.cpp
     src/UsdUI.cpp )
@@ -38,7 +39,7 @@ target_compile_definitions( UsdConverterObjectlib
 
 set_target_properties( UsdConverterObjectlib PROPERTIES POSITION_INDEPENDENT_CODE ON )
 
-if (WIN32)
+if ( WIN32 )
   target_compile_definitions( UsdConverterObjectlib
     PUBLIC
       NOMINMAX )
@@ -69,6 +70,25 @@ target_link_libraries( UsdConverter
 
 install( TARGETS UsdConverter DESTINATION . )
 
-if (WITH_UNITTESTS)
-  add_subdirectory( unit_tests )
+add_nuke_plugin( usdSceneReader
+  src/UsdCommon.cpp
+  src/UsdSceneReader.cpp
+  src/UsdSceneGraphPlugin.cpp
+  src/UsdAxisScenePlugin.cpp
+  src/UsdCameraScenePlugin.cpp
+  src/UsdLightScenePlugin.cpp )
+target_include_directories( usdSceneReader PUBLIC include )
+target_link_libraries(usdSceneReader
+  PRIVATE
+    Nuke::UsdConverter
+    Nuke::NDK
+    usd
+    usdGeom
+    usdLux
+)
+
+install( TARGETS usdSceneReader DESTINATION . )
+
+if ( WITH_UNITTESTS )
+ add_subdirectory( unit_tests )
 endif()

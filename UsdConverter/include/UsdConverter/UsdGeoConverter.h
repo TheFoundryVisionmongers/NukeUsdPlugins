@@ -35,7 +35,6 @@
 #define USD_CONVERTER_H
 
 #include <UsdConverter/UsdConverterApi.h>
-#include <UsdConverter/UsdTypes.h>
 
 // Standard includes
 #include <memory>
@@ -46,6 +45,7 @@
 #include <pxr/base/tf/type.h>
 #include <pxr/pxr.h>
 
+#include <DDImage/SceneItem.h>
 namespace DD
 {
   namespace Image
@@ -103,10 +103,18 @@ namespace Foundry
 
     /*! Get a list of primitive data for all prims in a USD file
      * \param filename  USD file to load
+     * \param types map of primitive type to nuke node to create
      * \return PrimitiveData object containing prim paths and their types
      */
-    FN_USDCONVERTER_API PrimitiveData
-    getPrimitiveData(const std::string& filename);
+    FN_USDCONVERTER_API DD::Image::SceneItems
+    getPrimitiveData(const std::string& filename, const std::unordered_map<std::string, std::string>& types);
+    /*! Get a list of primitive data for all prims in a stage
+     * \param stage USD stage to load
+     * \param types map of primitive type to nuke node to create
+     * \return PrimitiveData object containing prim paths and their types
+     */
+    FN_USDCONVERTER_API DD::Image::SceneItems
+    getPrimitiveData(const PXR_NS::UsdStageRefPtr& stage, const std::unordered_map<std::string, std::string>& types);
 
     // PRIVATE API
     /*! Identify the USD prim type and if supported convert it to Nuke geometry
@@ -117,6 +125,7 @@ namespace Foundry
      */
     int addUsdPrim(DD::Image::GeometryList& out, const PXR_NS::UsdPrim& prim,
                    const PXR_NS::UsdTimeCode time);
+
   }  //namespace UsdConverter
 }  // namespace Foundry
 

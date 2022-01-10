@@ -39,9 +39,10 @@ option(WITH_UNITTESTS "Enable unit test building" OFF)
 
 if (WITH_UNITTESTS)
   find_package(Catch2 REQUIRED)
+  find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets)
   add_library(CatchTestMain OBJECT CatchTestMain.cpp)
   add_library(Nuke::CatchTestMain ALIAS CatchTestMain)
-  target_link_libraries(CatchTestMain PUBLIC Catch2::Catch2)
+  target_link_libraries(CatchTestMain PUBLIC Qt5::Gui Catch2::Catch2)
 
   function(add_nuke_unittest TARGET_NAME)
     add_executable(${TARGET_NAME} ${ARGN})

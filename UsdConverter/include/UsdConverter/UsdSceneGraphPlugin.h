@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,50 +21,32 @@
 // language governing permissions and limitations under the Apache License.
 
 /*! \file
- \brief Implementation file for UsdConverter unit test helpers
+ \brief plugin for querying the USD scene to display in the SceneGraphKnob
  */
 
-#include "TestFixtures.h"
+#ifndef USDSCENEGRAPHPLUGIN_H
+#define USDSCENEGRAPHPLUGIN_H
 
-#include <DDImage/GeoOp.h>
-#include <DDImage/Scene.h>
+#include <DDImage/SceneReaderPlugin.h>
+#include <DDImage/SceneGraphBrowserI.h>
 
-using namespace DD::Image;
-
-TestGeoOp::TestGeoOp() : GeoOp(nullptr)
+namespace Foundry
 {
-  setupScene();
+  namespace UsdConverter
+  {
+    /// plugin class for the Nuke SceneGraph
+    class UsdSceneGraphPlugin : public DD::Image::SceneReaderPlugin {
+    public:
+      UsdSceneGraphPlugin();
+      ~UsdSceneGraphPlugin() override;
+
+      /// check if the file can be used by this plugin
+      bool isValid(const std::string& filename) override;
+      /// return a list of primitives
+      bool query(std::istream& in, std::ostream &out) const override;
+    };
+    DD::Image::SceneReaders::PluginDescription usdSceneGraphPlugin(DD::Image::SceneGraph::kSceneGraphPluginClass, { "usd", "usda", "usdc", "usdz" }, DD::Image::SceneReaders::Constructor<UsdSceneGraphPlugin>);
+  }
 }
 
-const char* TestGeoOp::node_help() const
-{
-  return "geo op for testing";
-}
-
-const char* TestGeoOp::Class() const
-{
-  return "TestGeoOp";
-}
-
-GeometryList* TestGeoOp::geometryList()
-{
-  return scene()->object_list();
-}
-
-MemoryAllocator::MemoryAllocator()
-{
-  Allocators::g3DAllocator =
-      Memory::create_allocator<BlockAllocator>("3D System");
-}
-
-MemoryAllocator::~MemoryAllocator()
-{
-  Memory::unregister_allocator(Allocators::g3DAllocator);
-  delete Allocators::g3DAllocator;
-}
-
-std::ostream& DD::Image::operator<<(std::ostream& o, const Vector3& v)
-{
-  o << '{' << v.x << ' ' << v.y << ' ' << v.z << '}';
-  return o;
-}
+#endif

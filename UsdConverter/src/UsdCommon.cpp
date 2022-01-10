@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,50 +21,30 @@
 // language governing permissions and limitations under the Apache License.
 
 /*! \file
- \brief Implementation file for UsdConverter unit test helpers
+ \brief Rotation function for camera matrix
  */
 
-#include "TestFixtures.h"
+#include "UsdConverter/UsdCommon.h"
+#include <pxr/usd/usdGeom/tokens.h>
 
-#include <DDImage/GeoOp.h>
-#include <DDImage/Scene.h>
-
-using namespace DD::Image;
-
-TestGeoOp::TestGeoOp() : GeoOp(nullptr)
+namespace Foundry
 {
-  setupScene();
-}
-
-const char* TestGeoOp::node_help() const
-{
-  return "geo op for testing";
-}
-
-const char* TestGeoOp::Class() const
-{
-  return "TestGeoOp";
-}
-
-GeometryList* TestGeoOp::geometryList()
-{
-  return scene()->object_list();
-}
-
-MemoryAllocator::MemoryAllocator()
-{
-  Allocators::g3DAllocator =
-      Memory::create_allocator<BlockAllocator>("3D System");
-}
-
-MemoryAllocator::~MemoryAllocator()
-{
-  Memory::unregister_allocator(Allocators::g3DAllocator);
-  delete Allocators::g3DAllocator;
-}
-
-std::ostream& DD::Image::operator<<(std::ostream& o, const Vector3& v)
-{
-  o << '{' << v.x << ' ' << v.y << ' ' << v.z << '}';
-  return o;
-}
+  namespace UsdConverter
+  {
+    void ApplyUpAxisRotation(PXR_NS::GfMatrix4d& mat, const PXR_NS::TfToken& upAxis)
+    {
+      if(upAxis== PXR_NS::UsdGeomTokens->z) {
+        mat *= PXR_NS::GfMatrix4d( 1, 0, 0, 0,
+                                   0, 0,-1, 0,
+                                   0, 1, 0, 0,
+                                   0, 0, 0, 1); // Rotate in X
+      }
+      else if (upAxis == PXR_NS::UsdGeomTokens->x) {
+        mat *= PXR_NS::GfMatrix4d( 0, 1, 0, 0,
+                                  -1, 0, 0, 0,
+                                   0, 0, 1, 0,
+                                   0, 0, 0, 1); // Rotate in Z
+      }
+    }
+  }  // namespace UsdConverter
+}  // namespace Foundry
