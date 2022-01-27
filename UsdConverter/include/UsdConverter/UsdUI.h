@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -27,14 +27,18 @@
 #ifndef USD_UI_H
 #define USD_UI_H
 
+#include <string>
+#include <unordered_map>
+
 #include <UsdConverter/UsdConverterApi.h>
-#include <UsdConverter/UsdTypes.h>
 
 namespace DD
 {
   namespace Image
   {
     class SceneGraph_KnobI;
+    class SceneItem;
+    typedef std::vector<SceneItem> SceneItems;
   }
 }  // namespace DD
 
@@ -43,6 +47,25 @@ namespace Foundry
   /// for UI integration with nuke
   namespace UsdConverter
   {
+    /// Maps USD prim types to Nuke nodes that can utilize them
+    static const std::unordered_map<std::string, std::string> supportedPrimTypes {
+      {"Mesh", "ReadGeo2"},
+      {"Cube", "ReadGeo2"},
+      {"PointInstancer", "ReadGeo2"},
+      {"Points", "ReadGeo2"},
+      {"Camera", "Camera3"},
+      {"DistantLight", "Light3"},
+      {"SphereLight", "Light3"}
+    };
+
+    static const std::unordered_map<std::string, std::string> supportedGeoTypes {
+      {"Mesh", "ReadGeo2"},
+      {"Cube", "ReadGeo2"},
+      {"PointInstancer", "ReadGeo2"},
+      {"Points", "ReadGeo2"}
+    };
+
+
     /*! launch a scene view browser with data from the filename
     * \param pSceneGraphKnob the scene view graph knob
     * \param filename the name of the usd file to load
@@ -57,18 +80,21 @@ namespace Foundry
     /*! internal function for filling the scene view knob with data
     * \param pSceneGraphKnob the scene view graph knob
     * \param filename the name of the usd file to load
-    * \param primitives values to insert into the scene graph
-       *   accepted keys:
-       *     "name" - the name of the item in the list
-       *     "type" - the type of the item
+    * \param items collection of scene items to insert into the scene
     * \param showBrowser True if the scene browser is launched as a pop up
     * \param resetSelected True if the contents of the scene browser should be reset to what is in the file
     * \return False if the browser was requested but could not be created
     */
     bool PopulateSceneGraph(DD::Image::SceneGraph_KnobI* pSceneGraphKnob,
                             const char* filename,
-                            const PrimitiveData& primitives, bool showBrowser,
+                            const DD::Image::SceneItems& items, bool showBrowser,
                             bool resetSelected);
+
+    /*! Respond to queries about the USD file
+     * \param in arguments into the function, either SceneGraph::kSceneGraphKnobCommand or SceneGraph::kSceneGraphTypeCommand
+     * \returns true if there were any primitives, false otherwise
+     */
+    FN_USDCONVERTER_API bool QueryPrimitives(std::istream& in, std::ostream &out);
   }  //namespace UsdConverter
 }  // namespace Foundry
 

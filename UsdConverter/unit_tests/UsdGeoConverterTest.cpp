@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -38,6 +38,7 @@
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/pointInstancer.h>
 #include <pxr/usd/usdGeom/points.h>
+#include <pxr/usd/usdGeom/sphere.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usdGeom/xformCache.h>
 #include <pxr/usd/usdGeom/xformCommonAPI.h>
@@ -46,6 +47,7 @@
 
 #include "TestFixtures.h"
 #include "UsdConverter/UsdGeoConverter.h"
+#include "UsdConverter/UsdUI.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -196,6 +198,12 @@ TEST_CASE("Prim conversions")
   SECTION("UsdGeomPointInstancer")
   {
     UsdGeomPointInstancer fromPrim = UsdGeomPointInstancer::Define(stage, path);
+    UsdGeomXformOp op = fromPrim.MakeMatrixXform();
+    GfMatrix4d transformMatrix(1, 0, 0, 0,
+                               0, 1, 0, 0,
+                               0, 0, 1, 0,
+                               2, 2, 2, 1);
+    op.Set(transformMatrix);
 
     UsdGeomMesh fromMesh;
     VtVec3fArray points;
@@ -245,8 +253,8 @@ TEST_CASE("Prim conversions")
     MemoryAllocator context;
     TestGeoOp geo;
     addUsdPrim<UsdGeomPointInstancer>(*geo.geometryList(), fromPrim, time);
-    // 1 for the usd point instance, 2 instances of polymesh
-    REQUIRE(geo.geometryList()->objects() == 3);
+    // 2 instances of polymesh
+    REQUIRE(geo.geometryList()->objects() == 2);
 
     GeoInfo& info = geo.geometryList()->object(1);
     CHECK_THAT(points,
@@ -271,6 +279,16 @@ TEST_CASE("Prim conversions")
                    *(info.get_group_attribute(Group_Vertices, kUVAttrName)
                          ->vector4_list),
                    2));
+
+    VtVec4fArray extectedTransform{{ 1.f,  0.f,  0.f, 0.f},
+                                   { 0.f,  1.f,  0.f, 0.f},
+                                   { 0.f,  0.f,  1.f, 0.f},
+                                   {22.f, 22.f, 22.f, 1.f} };
+    CHECK_THAT(extectedTransform,
+      ArraysOfVectorsEqual<decltype(extectedTransform)>(
+        *(info.get_group_attribute(Group_Object, kTransformAttrName)
+          ->vector4_list),
+        4));
   }
 }
 
@@ -295,4 +313,28 @@ TEST_CASE_METHOD(MemoryAllocator, "Add transforms")
       CHECK(expectedMatrix[c][r] == testResult[c][r]);
     }
   }
+}
+
+TEST_CASE("getPrimitiveData returns correct data")
+{
+  UsdStageRefPtr stage = UsdStage::CreateInMemory();
+  SdfPath path("/points1");
+  UsdGeomPoints points = UsdGeomPoints::Define(stage, path);
+  SdfPath cubePath("/cube1");
+  auto cube = UsdGeomCube::Define(stage, cubePath);
+  SdfPath meshPath("/mesh1");
+  auto mesh = UsdGeomMesh::Define(stage, meshPath);
+  SdfPath instancePath("/instancer1");
+  auto instancer = UsdGeomPointInstancer::Define(stage, instancePath);
+  SdfPath spherePath("/sphere1");
+  auto sphere = UsdGeomSphere::Define(stage, spherePath);
+
+  const SceneItems& data = getPrimitiveData(stage, supportedPrimTypes);
+  SceneItems expected;
+  expected.emplace_back("/points1", "Points");
+  expected.emplace_back("/cube1", "Cube");
+  expected.emplace_back("/mesh1", "Mesh");
+  expected.emplace_back("/instancer1", "PointInstancer");
+  expected.emplace_back("/sphere1", "Sphere", false);
+  CHECK(data == expected);
 }

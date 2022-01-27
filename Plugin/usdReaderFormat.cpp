@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -57,7 +57,7 @@ void usdReaderFormat::extraKnobs(Knob_Callback f)
   Tab_knob(f, "Scenegraph");
 
   Knob* pNodeNameKnob =
-      SceneGraph_knob(f, &_nodeNameIndex, &SceneGraph::kDefaultFields,
+      SceneGraph_knob(f, &_nodeNameIndex, nullptr,
                       kNodeKnobName.c_str(), "");
   if(pNodeNameKnob != nullptr) {
     SetFlags(f, Knob::SAVE_MENU | Knob::EARLY_STORE | Knob::ALWAYS_SAVE);

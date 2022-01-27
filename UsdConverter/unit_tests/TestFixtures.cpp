@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -28,10 +28,8 @@
 
 #include <DDImage/GeoOp.h>
 #include <DDImage/Scene.h>
-#include <pxr/pxr.h>
 
 using namespace DD::Image;
-PXR_NAMESPACE_USING_DIRECTIVE;
 
 TestGeoOp::TestGeoOp() : GeoOp(nullptr)
 {

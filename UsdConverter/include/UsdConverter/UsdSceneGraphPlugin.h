@@ -21,13 +21,32 @@
 // language governing permissions and limitations under the Apache License.
 
 /*! \file
- \brief The Catch2 unit test framework's main function is implemented here
+ \brief plugin for querying the USD scene to display in the SceneGraphKnob
  */
 
-#define CATCH_CONFIG_RUNNER
-#include "catch2/catch.hpp"
+#ifndef USDSCENEGRAPHPLUGIN_H
+#define USDSCENEGRAPHPLUGIN_H
 
-int main(int argc, char** argv)
+#include <DDImage/SceneReaderPlugin.h>
+#include <DDImage/SceneGraphBrowserI.h>
+
+namespace Foundry
 {
-  return Catch::Session().run(argc, argv);
+  namespace UsdConverter
+  {
+    /// plugin class for the Nuke SceneGraph
+    class UsdSceneGraphPlugin : public DD::Image::SceneReaderPlugin {
+    public:
+      UsdSceneGraphPlugin();
+      ~UsdSceneGraphPlugin() override;
+
+      /// check if the file can be used by this plugin
+      bool isValid(const std::string& filename) override;
+      /// return a list of primitives
+      bool query(std::istream& in, std::ostream &out) const override;
+    };
+    DD::Image::SceneReaders::PluginDescription usdSceneGraphPlugin(DD::Image::SceneGraph::kSceneGraphPluginClass, { "usd", "usda", "usdc", "usdz" }, DD::Image::SceneReaders::Constructor<UsdSceneGraphPlugin>);
+  }
 }
+
+#endif

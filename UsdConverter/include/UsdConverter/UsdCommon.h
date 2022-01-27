@@ -20,14 +20,19 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 
-/*! \file
- \brief The Catch2 unit test framework's main function is implemented here
- */
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/tf/token.h>
 
-#define CATCH_CONFIG_RUNNER
-#include "catch2/catch.hpp"
-
-int main(int argc, char** argv)
+namespace Foundry
 {
-  return Catch::Session().run(argc, argv);
-}
+  namespace UsdConverter
+  {
+    /*! Apply a rotation to a matrix to convert from the axis direction defined by the token to Nuke's
+     * axis direction (Y up)
+     * \param mat the matrix on which to apply the transoform
+     * \param upAxis token defining the up axis direction we are converting from ("X", "Y" or "Z")
+     */
+    void ApplyUpAxisRotation(PXR_NS::GfMatrix4d& mat, const PXR_NS::TfToken& upAxis);
+
+  }  // namespace UsdConverter
+}  // namespace Foundry

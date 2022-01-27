@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -30,10 +30,12 @@
 #include <DDImage/SceneGraph_KnobI.h>
 
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <unordered_map>
 
 #include "UsdConverter/UsdGeoConverter.h"
+#include "UsdConverter/UsdUI.h"
 
 using namespace DD::Image;
 namespace Foundry
@@ -54,9 +56,20 @@ namespace Foundry
       return false;
     }
 
+    namespace {
+      bool hasAnyOf(SceneGraph_KnobI* pSceneGraphKnob, const DD::Image::SceneItems& primitives) {
+        if (!pSceneGraphKnob || pSceneGraphKnob->isEmpty())
+          return false;
+
+        return std::any_of(primitives.cbegin(), primitives.cend(), [pSceneGraphKnob](const DD::Image::SceneItem& prim) {
+          return pSceneGraphKnob->getItem(prim.name);
+        });
+      }
+    }
+
     bool PopulateSceneGraph(SceneGraph_KnobI* pSceneGraphKnob,
                             const char* pFilename,
-                            const PrimitiveData& primitives, bool showBrowser,
+                            const DD::Image::SceneItems& primitives, bool showBrowser,
                             bool resetSelected)
     {
       pSceneGraphKnob->setColumnHeader(pFilename);
@@ -90,14 +103,33 @@ namespace Foundry
         return false;
       }
 
-      PrimitiveData primitives = getPrimitiveData(pFilename);
-      if(primitives.empty()) {
-        return false;
+      DD::Image::SceneItems primitives = getPrimitiveData(pFilename, supportedGeoTypes);
+
+      if (resetSelected && hasAnyOf(pSceneGraphKnob, primitives)) {
+        showBrowser = false;
+        resetSelected = false;
       }
       PopulateSceneGraph(pSceneGraphKnob, pFilename, primitives, showBrowser,
                          resetSelected);
 
+      const bool hasSupportedItems = std::any_of(primitives.cbegin(), primitives.cend(), [](const auto& prim) {
+        return prim.enabled;
+        });
+
+      return hasSupportedItems;
+    }
+
+    FN_USDCONVERTER_API bool QueryPrimitives(std::istream& in, std::ostream &out) {
+      std::string filename;
+      in >> std::quoted(filename);
+      DD::Image::SceneItems primitiveData = getPrimitiveData(filename, supportedPrimTypes);
+      if(primitiveData.empty()) {
+        return false;
+      }
+      DD::Image::SceneGraph::SerialiseSceneData(primitiveData, out);
       return true;
     }
+
+
   }  // namespace UsdConverter
 }  // namespace Foundry

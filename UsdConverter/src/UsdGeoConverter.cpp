@@ -1,4 +1,4 @@
-// Copyright 2020 Foundry
+// Copyright 2021 Foundry
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -28,8 +28,11 @@
 #include <DDImage/Particles.h>
 #include <DDImage/PolyMesh.h>
 #include <DDImage/RenderParticles.h>
+#include <DDImage/SceneItem.h>
 #include <UsdConverter/UsdAttrConverter.h>
 #include <UsdConverter/UsdGeoConverter.h>
+#include <UsdConverter/UsdCommon.h>
+#include <UsdConverter/UsdUI.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/relationship.h>
 #include <pxr/usd/usdGeom/cube.h>
@@ -38,6 +41,7 @@
 #include <pxr/usd/usdGeom/points.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usdGeom/xformCache.h>
+#include <pxr/usd/usdGeom/metrics.h>
 
 using namespace DD::Image;
 
@@ -154,7 +158,7 @@ namespace Foundry
 
     // Helper for adding point instancer geometry
     int AddInstancedPrim(GeometryList& out, const UsdPrim& instance,
-                         const int proto, std::map<TfToken, int>& protoObjects,
+                         const int proto,
                          const std::vector<UsdAttribute>& primAttributes,
                          const std::vector<UsdAttribute>& constantAttributes,
                          const std::vector<UsdAttribute>& remainingAttributes,
@@ -163,8 +167,6 @@ namespace Foundry
                          const ColorUvData& instancerData,
                          const UsdTimeCode time)
     {
-      auto object_it = protoObjects.find(instance.GetName());
-
       UsdAttributeVector instanceAttributes = instance.GetAttributes();
       const auto hasInstancerAttribute = [&](const auto& attribute) {
         return std::any_of(
@@ -182,55 +184,21 @@ namespace Foundry
       instanceAttributes.insert(instanceAttributes.begin(),
                                 constantAttributes.begin(),
                                 constantAttributes.end());
-      int instanceObj = -1;
-      // Convert the primitive once, and then make the other primitives reference its data
-      if(object_it == protoObjects.end()) {
-        instanceObj = addUsdPrim(out, instance, time);
-        ConvertUsdAttributes(out, instanceObj, instanceAttributes, time);
-      }
-      else {
-        instanceObj = out.size();
-        out.add_object(instanceObj);
-        GeoInfo& instanceGeo = out[instanceObj];
-        GeoInfo& protoGeo = out[object_it->second];
-        const GeoInfo::Cache* instanceCache = instanceGeo.get_cache_pointer();
-        const GeoInfo::Cache* protoCache = protoGeo.get_cache_pointer();
-
-        PrimitiveListPtr instancePrimitives = instanceCache->primitives;
-        instancePrimitives = protoCache->primitives;
-
-        PointListPtr instancePoints = instanceCache->points;
-        instancePoints = protoCache->points;
-
-        for(const auto& fromAttr : instanceAttributes) {
-          Attribute* toAttr = ConstructAttribute(out, instanceObj, fromAttr);
-          Attribute* protoAttr = out.writable_attribute(
-              object_it->second, ConvertGroupType(fromAttr), toAttr->name(),
-              toAttr->type());
-          toAttr->float_list = protoAttr->float_list;
-          toAttr->vector2_list = protoAttr->vector2_list;
-          toAttr->vector3_list = protoAttr->vector3_list;
-          toAttr->vector4_list = protoAttr->vector4_list;
-          toAttr->matrix3_list = protoAttr->matrix3_list;
-          toAttr->matrix4_list = protoAttr->matrix4_list;
-          toAttr->string_list = protoAttr->string_list;
-          toAttr->std_string_list = protoAttr->std_string_list;
-          toAttr->pointer_list = protoAttr->pointer_list;
-          toAttr->data = protoAttr->data;
-        }
-      }
-
+      const auto instanceObj = addUsdPrim(out, instance, time);
       if(instanceObj == -1) {
         return instanceObj;
       }
+      ConvertUsdAttributes(out, instanceObj, instanceAttributes, time);
 
       ColorUvData instanceData(instancerData, proto);
       // Apply the attributes that the instancer overrides
       ConvertColorUvs(out, instanceObj, instanceData);
       for(const auto& attribute : remainingAttributes) {
         Attribute* toAttr = ConstructAttribute(out, instanceObj, attribute);
-        ConvertValues(toAttr, attribute, time, proto,
-                      UsdGeomPrimvar(attribute).GetElementSize());
+        if(toAttr) {
+          ConvertValues(toAttr, attribute, time, proto,
+                        UsdGeomPrimvar(attribute).GetElementSize());
+        }
       }
       if(pointInstancerTransforms) {
         ConvertObjectTransform(out, instanceObj, xforms[proto]);
@@ -251,9 +219,6 @@ namespace Foundry
         GeometryList& out, const UsdGeomPointInstancer& fromPrim,
         const UsdTimeCode time)
     {
-      const int obj = out.size();
-      out.add_object(obj);
-
       UsdStageWeakPtr stage = fromPrim.GetPrim().GetStage();
 
       UsdAttribute a_protoIndicies = fromPrim.GetProtoIndicesAttr();
@@ -268,8 +233,14 @@ namespace Foundry
           fromPrim.GetPrim().GetAuthoredAttributes();
 
       VtArray<GfMatrix4d> xforms;
-      bool pointInstancerTransforms =
+      const bool pointInstancerTransforms =
           fromPrim.ComputeInstanceTransformsAtTime(&xforms, time, time);
+
+      UsdGeomXformCache cache(time);
+      const GfMatrix4d worldMatrix = cache.GetLocalToWorldTransform(fromPrim.GetPrim());
+      //Move xforms from local coordinates to world coordinates
+      for (size_t i = 0; i<xforms.size(); ++i)
+        xforms[i] *= worldMatrix;
 
       // Split the attributes into those that need to be applied for all instances, and those that elementSize offsets
       std::vector<UsdAttribute> constantAttributes;
@@ -296,19 +267,34 @@ namespace Foundry
           continue;
         }
         UsdPrim root = stage->GetPrimAtPath(paths[protoIndices[proto]]);
-        std::map<TfToken, int> protoObjects;
-        AddInstancedPrim(out, root, proto, protoObjects, primAttributes,
-                         constantAttributes, remainingAttributes,
-                         pointInstancerTransforms, xforms, instancerData, time);
-        for(const auto& instance : root.GetAllDescendants()) {
-          AddInstancedPrim(out, instance, proto, protoObjects, primAttributes,
-                           constantAttributes, remainingAttributes,
-                           pointInstancerTransforms, xforms, instancerData,
+        if(!root) {
+          continue;
+        }
+
+        const auto addInstance = [&out, &proto,
+                                  &primAttributes, &constantAttributes, &remainingAttributes,
+                                  &pointInstancerTransforms, &xforms,
+                                  &instancerData,
+                                  &time](auto& instance) {
+          AddInstancedPrim(out, instance, proto,
+                           primAttributes, constantAttributes, remainingAttributes,
+                           pointInstancerTransforms,  xforms,
+                           instancerData,
                            time);
+        };
+
+        const auto allDescs = root.GetAllDescendants();
+        if(allDescs.empty()) {
+          addInstance(root);
+        }
+        else {
+          for(const auto& instance : allDescs) {
+            addInstance(instance);
+          }
         }
       }
 
-      return obj;
+      return -1;
     }
 
     // Helpers for UsdGeomCube conversion
@@ -396,27 +382,29 @@ namespace Foundry
       return -1;
     }
 
-    FN_USDCONVERTER_API PrimitiveData
-    getPrimitiveData(const std::string& filename)
+
+    FN_USDCONVERTER_API DD::Image::SceneItems
+    getPrimitiveData(const UsdStageRefPtr& stage, const std::unordered_map<std::string, std::string>& types)
     {
-      PrimitiveData items;
+      DD::Image::SceneItems items;
+      for(const auto& prim : stage->Traverse()) {
+        const auto& primPath = prim.GetPath().GetString();
+        const auto& typeName = prim.GetTypeName();
+        const auto enabled = (types.find(typeName) != types.end());
+        items.emplace_back(primPath, typeName, enabled);
+      }
+      return items;
+    }
+
+    FN_USDCONVERTER_API DD::Image::SceneItems
+    getPrimitiveData(const std::string& filename, const std::unordered_map<std::string, std::string>& types)
+    {
       // Open the stage from file
       UsdStageRefPtr stage = UsdStage::Open(filename);
       if(!stage) {
-        return items;
+        return DD::Image::SceneItems();
       }
-      // Traverse the stage and add all prims and their type to items
-      auto range = UsdPrimRange::PreAndPostVisit(stage->GetPseudoRoot());
-      bool isRecursing = false;
-      for(auto it = range.cbegin(); it != range.cend(); ++it) {
-        if(!isRecursing && it.IsPostVisit()) {
-          const TfToken& type = it->GetTypeName();
-          items["name"].push_back(it->GetPath().GetString());
-          items["type"].push_back(type.GetString());
-        }
-        isRecursing = it.IsPostVisit();
-      }
-      return items;
+      return getPrimitiveData(stage, types);
     }
 
     FN_USDCONVERTER_API void convertUsdGeometry(GeometryList& out,
@@ -426,6 +414,9 @@ namespace Foundry
       // Traverse the stage at the required timecode and convert all loaded USD prims to Nuke geometry
       UsdGeomXformCache cache;
       cache.SetTime(time);
+
+      const TfToken upAxis = UsdGeomGetStageUpAxis(stage);
+
       for(const auto& prim : stage->Traverse()) {
         const int obj = addUsdPrim(out, prim, time);
         if(obj == -1) {
@@ -435,6 +426,7 @@ namespace Foundry
         ConvertUsdAttributes(out, obj, prim.GetAttributes(), time);
         ConvertPrimPath(out, obj, prim);
         GfMatrix4d world = cache.GetLocalToWorldTransform(prim);
+        ApplyUpAxisRotation(world, upAxis);
         ConvertObjectTransform(out, obj, world);
       }
     }

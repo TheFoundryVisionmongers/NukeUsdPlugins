@@ -21,13 +21,30 @@
 // language governing permissions and limitations under the Apache License.
 
 /*! \file
- \brief The Catch2 unit test framework's main function is implemented here
+ \brief Rotation function for camera matrix
  */
 
-#define CATCH_CONFIG_RUNNER
-#include "catch2/catch.hpp"
+#include "UsdConverter/UsdCommon.h"
+#include <pxr/usd/usdGeom/tokens.h>
 
-int main(int argc, char** argv)
+namespace Foundry
 {
-  return Catch::Session().run(argc, argv);
-}
+  namespace UsdConverter
+  {
+    void ApplyUpAxisRotation(PXR_NS::GfMatrix4d& mat, const PXR_NS::TfToken& upAxis)
+    {
+      if(upAxis== PXR_NS::UsdGeomTokens->z) {
+        mat *= PXR_NS::GfMatrix4d( 1, 0, 0, 0,
+                                   0, 0,-1, 0,
+                                   0, 1, 0, 0,
+                                   0, 0, 0, 1); // Rotate in X
+      }
+      else if (upAxis == PXR_NS::UsdGeomTokens->x) {
+        mat *= PXR_NS::GfMatrix4d( 0, 1, 0, 0,
+                                  -1, 0, 0, 0,
+                                   0, 0, 1, 0,
+                                   0, 0, 0, 1); // Rotate in Z
+      }
+    }
+  }  // namespace UsdConverter
+}  // namespace Foundry
